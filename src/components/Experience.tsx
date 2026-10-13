@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import film from "@/film.json";
+import filmP from "@/film-p.json";
 import { FLEET, PROGRAMS } from "@/data";
 
 type Cap = { a: number; b: number; key: string; eyebrow?: string; title?: string; sub?: string; end?: boolean; pos?: "c" | "l" };
@@ -28,6 +29,30 @@ const CHAPTERS = [
   { name: "Terminal", t: st("aVP1-HNY-01") }, { name: "Crew", t: st("aVP1-HNY-10") }, { name: "Aircraft", t: st("aUBWr3NY-03") },
   { name: "On board", t: st("aJIgmaTt-01") }, { name: "In flight", t: st("aUBWr3NY-07") }, { name: "Beyond", t: st("aUBaAnNY-15") }, { name: "Arrival", t: st("aj1ggVbR-13") },
 ];
+
+// ---- Jeu de données MOBILE (film vertical) : légendes courtes calées sur ses propres plans
+const shP = (id: string) => filmP.shots.find((x) => x.id === id)!;
+const stP = (id: string) => shP(id).start;
+const enP = (id: string) => shP(id).start + shP(id).dur;
+const spanP = (from: string, to: string, key: string, c: Omit<Cap, "a" | "b" | "key">, lead = 0.4, tail = 0.3): Cap => ({ a: stP(from) + lead, b: enP(to) - tail, key, pos: "l", ...c });
+const CAPS_P: Cap[] = [
+  spanP("m-G650p24-04", "m-G650p24-04", "open", { eyebrow: "A new measure of luxury", title: "Refine how you arrive.", sub: "You won’t just be flown, you’ll be moved." }, 0.7, 0.4),
+  spanP("m-WHY24-02", "m-PROG24-03", "terminal", { eyebrow: "Private terminals", title: "Every journey begins on the ground." }, 0.5, 0.2),
+  spanP("r-hostess", "m-PROG24-04", "crew", { eyebrow: "Pilots & crews", title: "1,500+ pilots, trained to the highest standard.", sub: "Backed by 25+ consecutive FAA Diamond Awards." }, 0.3, 0.1),
+  spanP("m-HERO26-06", "r-door", "aircraft", { eyebrow: "Your aircraft", title: "Ready when you are.", sub: "Nine aircraft, from the Phenom 300 to the Gulfstream G700." }, 0.3, 0.1),
+  spanP("m-P600p24-01", "m-P600E26-05", "cabin", { eyebrow: "On board", title: "New dimensions of delight.", sub: "A 42-inch 4K OLED Smart Window™ with real-time exterior views, powered by Starlink." }, 0.2, 0.05),
+  spanP("m-P600E26-01", "m-G650p24-03", "window", { eyebrow: "On board", title: "Room to settle in.", sub: "Fully reclining seats, a wet galley akin to a class up, and a quiet, spacious cabin." }, 0.2, 0.2),
+  spanP("m-HERO26-04", "m-HERO26-04", "sky", { eyebrow: "In flight", title: "At Flexjet, we abide by only the extra mile." }, 0.5, 0.15),
+  spanP("m-S76p24-05", "m-LIFE26-04", "heli", { eyebrow: "Helicopter access", title: "Premium rotary-wing travel." }, 0.2, 0.1),
+  { a: stP("r-heli") + 0.3, b: 9999, key: "end", eyebrow: "A new measure of luxury", title: "Your next arrival starts here.", end: true, pos: "c" },
+];
+const CHAPTERS_P = [
+  { name: "Terminal", t: stP("m-WHY24-02") }, { name: "Crew", t: stP("r-hostess") }, { name: "Aircraft", t: stP("m-HERO26-06") },
+  { name: "On board", t: stP("m-P600p24-01") }, { name: "In flight", t: stP("m-HERO26-04") }, { name: "Arrival", t: stP("m-HERO26-11") },
+];
+type DataSet = { D: number; caps: Cap[]; chapters: { name: string; t: number }[] };
+const SET_D: DataSet = { D: film.duration, caps: CAPS, chapters: CHAPTERS };
+const SET_P: DataSet = { D: filmP.duration, caps: CAPS_P, chapters: CHAPTERS_P };
 const D = film.duration;
 gsap.registerPlugin(ScrollToPlugin);
 
@@ -37,6 +62,8 @@ export default function Experience() {
   const bar = useRef<HTMLDivElement>(null);
   const clock = useRef<HTMLSpanElement>(null);
   const [cap, setCap] = useState(-1);
+  const [set, setSet] = useState<DataSet>(SET_D);
+  const setRef = useRef<DataSet>(SET_D);
   const [chapter, setChapter] = useState(0);
   const [ready, setReady] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -46,7 +73,7 @@ export default function Experience() {
 
   const jump = (t: number) => {
     const max = document.documentElement.scrollHeight - innerHeight;
-    gsap.to(window, { scrollTo: { y: (t / D) * max, autoKill: true }, duration: 1.8, ease: "power2.inOut" });
+    gsap.to(window, { scrollTo: { y: (t / setRef.current.D) * max, autoKill: true }, duration: 1.8, ease: "power2.inOut" });
   };
 
   useEffect(() => {
@@ -63,14 +90,15 @@ export default function Experience() {
     const pick = () => (innerHeight > innerWidth ? "p" : innerWidth <= 1100 || saveData ? "l" : "d");
     let variant = pick();
     const apply = () => { v.poster = variant === "p" ? "/film/poster-p.webp" : "/film/poster.webp"; v.src = `/film/film-${variant}.mp4`; };
-    apply();
+    const useSet = () => { const ds = variant === "p" ? SET_P : SET_D; setRef.current = ds; setSet(ds); setCap(-1); };
+    apply(); useSet();
     v.muted = true; v.load();
     let seeking = false, raf = 0, user = false;
     v.addEventListener("seeked", () => (seeking = false));
     const onReady = () => { setReady(true); v.play().then(() => v.pause()).catch(() => {}); };
     v.addEventListener("loadeddata", onReady, { once: true });
     const max = () => document.documentElement.scrollHeight - innerHeight;
-    const read = () => { S.target = Math.min(D - 0.04, Math.max(0, (scrollY / Math.max(1, max())) * D)); };
+    const read = () => { const DD = setRef.current.D; S.target = Math.min(DD - 0.04, Math.max(0, (scrollY / Math.max(1, max())) * DD)); };
     addEventListener("scroll", read, { passive: true }); read();
 
     // Introduction : le film démarre seul (défilement automatique) jusqu'à ce que le visiteur reprenne la main.
@@ -78,7 +106,7 @@ export default function Experience() {
     ["wheel", "touchstart", "keydown", "pointerdown"].forEach((e) => addEventListener(e, stop, { passive: true, once: true }));
     let intro: gsap.core.Tween | undefined;
     if (!reduce) {
-      const start = () => { if (!user) intro = gsap.to(window, { scrollTo: { y: (6.4 / D) * max() }, duration: 6.4, ease: "none", delay: 0.9 }); };
+      const start = () => { if (!user) intro = gsap.to(window, { scrollTo: { y: (6.4 / setRef.current.D) * max() }, duration: 6.4, ease: "none", delay: 0.9 }); };
       v.addEventListener("loadeddata", start, { once: true });
     }
 
@@ -92,11 +120,12 @@ export default function Experience() {
       const y = scrollY, vel = Math.min(1, Math.abs(y - S.y) / 60); S.y = y;
       S.v += (vel - S.v) * 0.12;
       if (stage.current && !reduce) stage.current.style.setProperty("--speed", S.v.toFixed(3));
-      if (bar.current) bar.current.style.transform = `scaleX(${(S.cur / D).toFixed(4)})`;
+      const DD = setRef.current.D;
+      if (bar.current) bar.current.style.transform = `scaleX(${(S.cur / DD).toFixed(4)})`;
       if (clock.current) clock.current.textContent = `${String(Math.floor(S.cur / 60)).padStart(2, "0")}:${String(Math.floor(S.cur % 60)).padStart(2, "0")}`;
-      const ci = CAPS.findIndex((c) => S.cur >= c.a && S.cur < c.b);
+      const ci = setRef.current.caps.findIndex((c) => S.cur >= c.a && S.cur < c.b);
       if (ci !== lastCap) { lastCap = ci; setCap(ci); }
-      let ch = 0; CHAPTERS.forEach((c, i) => { if (S.cur >= c.t - 0.1) ch = i; });
+      let ch = 0; setRef.current.chapters.forEach((c, i) => { if (S.cur >= c.t - 0.1) ch = i; });
       if (ch !== lastCh) { lastCh = ch; setChapter(ch); }
       raf = requestAnimationFrame(tick);
     };
@@ -104,12 +133,12 @@ export default function Experience() {
     const mm = (e: PointerEvent) => { if (!reduce && stage.current) { stage.current.style.setProperty("--mx", String((e.clientX / innerWidth - 0.5).toFixed(3))); stage.current.style.setProperty("--my", String((e.clientY / innerHeight - 0.5).toFixed(3))); } };
     addEventListener("pointermove", mm);
     let rt: ReturnType<typeof setTimeout>;
-    const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { const nv = pick(); if (nv !== variant) { variant = nv; apply(); v.load(); v.addEventListener("loadeddata", () => { v.currentTime = S.cur; }, { once: true }); } }, 250); };
+    const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { const nv = pick(); if (nv !== variant) { variant = nv; apply(); useSet(); v.load(); v.addEventListener("loadeddata", () => { v.currentTime = S.cur; }, { once: true }); } }, 250); };
     addEventListener("resize", onResize);
     return () => { cancelAnimationFrame(raf); removeEventListener("scroll", read); removeEventListener("pointermove", mm); removeEventListener("resize", onResize); intro?.kill(); };
   }, []);
 
-  const c = cap >= 0 ? CAPS[cap] : null;
+  const c = cap >= 0 ? set.caps[cap] : null;
   const keyed = useMemo(() => c?.key ?? "none", [c]);
 
   return (
@@ -142,8 +171,8 @@ export default function Experience() {
       )}
 
       <nav className="dock" aria-label="Film chapters">
-        <ol>{CHAPTERS.map((ch, i) => (
-          <li key={ch.name}><button className={i === chapter ? "on" : ""} onClick={() => jump(Math.min(D - 0.1, ch.t + 0.6))}><b>{String(i + 1).padStart(2, "0")}</b><span>{ch.name}</span></button></li>
+        <ol>{set.chapters.map((ch, i) => (
+          <li key={ch.name}><button className={i === chapter ? "on" : ""} onClick={() => jump(Math.min(set.D - 0.1, ch.t + 0.6))}><b>{String(i + 1).padStart(2, "0")}</b><span>{ch.name}</span></button></li>
         ))}</ol>
         <div className="track" aria-hidden="true"><div ref={bar} className="fill" /></div>
         <span ref={clock} className="clock" aria-hidden="true">00:00</span>

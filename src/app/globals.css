@@ -96,7 +96,7 @@ ul,ol{list-style:none}
 /* portrait (téléphones, tablettes verticales) */
 @media (max-aspect-ratio:1/1),(max-width:820px){
   :root{--bt:calc(52px + env(safe-area-inset-top));--bb:calc(40px + env(safe-area-inset-bottom));--pad:1.25rem}
-  .runway{height:1400vh;height:1400svh}
+  .runway{height:900vh;height:900svh}
   .cam{inset:0;transform:scale(calc(1.01 + var(--speed)*.02))}
   .film{object-fit:cover;object-position:50% 50%}
   .lb{height:var(--bt)}.lb.b{height:var(--bb)}
