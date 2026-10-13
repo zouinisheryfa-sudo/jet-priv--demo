@@ -58,8 +58,12 @@ export default function Experience() {
   useEffect(() => {
     const v = vref.current!, S = state.current;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const small = innerWidth <= 820 || (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    v.src = `/film/film-${small ? "m" : "d"}.mp4`;
+    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+    // Portrait : film vertical recadré plan par plan. Paysage : film 1080p (ordinateur) ou 720p (petits écrans).
+    const pick = () => (innerHeight > innerWidth ? "p" : innerWidth <= 1100 || saveData ? "l" : "d");
+    let variant = pick();
+    const apply = () => { v.poster = variant === "p" ? "/film/poster-p.webp" : "/film/poster.webp"; v.src = `/film/film-${variant}.mp4`; };
+    apply();
     v.muted = true; v.load();
     let seeking = false, raf = 0, user = false;
     v.addEventListener("seeked", () => (seeking = false));
@@ -99,7 +103,10 @@ export default function Experience() {
     raf = requestAnimationFrame(tick);
     const mm = (e: PointerEvent) => { if (!reduce && stage.current) { stage.current.style.setProperty("--mx", String((e.clientX / innerWidth - 0.5).toFixed(3))); stage.current.style.setProperty("--my", String((e.clientY / innerHeight - 0.5).toFixed(3))); } };
     addEventListener("pointermove", mm);
-    return () => { cancelAnimationFrame(raf); removeEventListener("scroll", read); removeEventListener("pointermove", mm); intro?.kill(); };
+    let rt: ReturnType<typeof setTimeout>;
+    const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { const nv = pick(); if (nv !== variant) { variant = nv; apply(); v.load(); v.addEventListener("loadeddata", () => { v.currentTime = S.cur; }, { once: true }); } }, 250); };
+    addEventListener("resize", onResize);
+    return () => { cancelAnimationFrame(raf); removeEventListener("scroll", read); removeEventListener("pointermove", mm); removeEventListener("resize", onResize); intro?.kill(); };
   }, []);
 
   const c = cap >= 0 ? CAPS[cap] : null;
@@ -164,8 +171,8 @@ export default function Experience() {
           )}
         </aside>
       )}
-      <div className="hint" aria-hidden="true"><span>Scroll to move through the film</span></div>
-      <div className="ribbon" role="note">Independent redesign concept proposed by ARMA Agency — not affiliated with Flexjet · Videos, brand and information © Flexjet, LLC · private demonstration</div>
+      <div className="hint" aria-hidden="true"><span className="h-d">Scroll to move through the film</span><span className="h-t">Swipe up to move through the film</span></div>
+      <div className="ribbon" role="note">Independent redesign concept proposed by ARMA Agency — not affiliated with Flexjet<span className="rb-x"> · Videos, brand and information © Flexjet, LLC · private demonstration</span></div>
       <div className="runway" aria-hidden="true" />
     </div>
   );
